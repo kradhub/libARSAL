@@ -40,17 +40,60 @@
 #include <libARSAL/ARSAL_Thread.h>
 #include <libARSAL/ARSAL_Print.h>
 
-#if defined(HAVE_PTHREAD_H)
+#if defined(_PSP)
+#include <pspthreadman.h>
+#elif defined(HAVE_PTHREAD_H)
 #include <pthread.h>
 #else
 #error The pthread.h header is required in order to build the library
+#endif
+
+#if defined(_PSP)
+struct psp_thread_data
+{
+    void *ret;
+    ARSAL_Thread_Routine_t func;
+    void *data;
+};
+
+struct psp_thread
+{
+    SceUID id;
+    struct psp_thread_data data;
+};
+
+static int psp_thread_generic_func(SceSize args, void *argp)
+{
+    struct psp_thread_data *data = (struct psp_thread_data *) argp;
+
+    data->ret = data->func(data->data);
+    return 0;
+}
 #endif
 
 int ARSAL_Thread_Create(ARSAL_Thread_t *thread, ARSAL_Thread_Routine_t routine, void *arg)
 {
     int result = 0;
 
-#if defined(HAVE_PTHREAD_H)
+#if defined(_PSP)
+    struct psp_thread *psp_thread = malloc(sizeof(*psp_thread));
+
+    psp_thread->data.func = routine;
+    psp_thread->data.data = arg;
+
+    psp_thread->id = sceKernelCreateThread("ARSAL thread",
+            psp_thread_generic_func, 0x11, 0x8000, PSP_THREAD_ATTR_USER, NULL);
+
+    if (psp_thread->id >= 0) {
+        sceKernelStartThread(psp_thread->id, sizeof(struct psp_thread_data),
+                &psp_thread->data);
+        *thread = (ARSAL_Thread_t) psp_thread;
+    } else {
+        free(psp_thread);
+        result = -1;
+    }
+
+#elif defined(HAVE_PTHREAD_H)
     pthread_t *pthread = (pthread_t *)malloc(sizeof(pthread_t));
     *thread = (ARSAL_Thread_t)pthread;
     result = pthread_create((pthread_t *)*thread, NULL, routine, arg);
@@ -63,7 +106,15 @@ int ARSAL_Thread_Join(ARSAL_Thread_t thread, void **retval)
 {
     int result = 0;
 
-#if defined(HAVE_PTHREAD_H)
+#if defined(_PSP)
+    struct psp_thread *psp_thread = (struct psp_thread *) thread;
+
+    sceKernelWaitThreadEnd(psp_thread->id, NULL);
+    sceKernelDeleteThread(psp_thread->id);
+
+    if (retval)
+        *retval = psp_thread->data.ret;
+#elif defined(HAVE_PTHREAD_H)
     result = pthread_join((*(pthread_t *)thread), retval);
 #endif
 
@@ -74,7 +125,11 @@ int ARSAL_Thread_Destroy(ARSAL_Thread_t *thread)
 {
     int result = 0;
 
-#if defined(HAVE_PTHREAD_H)
+#if defined(_PSP)
+    struct psp_thread *psp_thread = (struct psp_thread *) *thread;
+    sceKernelTerminateDeleteThread (psp_thread->id);
+    free(psp_thread);
+#elif defined(HAVE_PTHREAD_H)
     free(*thread);
 #endif
 
@@ -85,7 +140,9 @@ int ARSAL_Thread_GetThreadID(void)
 {
     int ret = -1;
 
-#if defined(HAVE_PTHREAD_H)
+#if defined(_PSP)
+    ret = sceKernelGetThreadId();
+#elif defined(HAVE_PTHREAD_H)
     ret = pthread_self();
 #endif
 

@@ -40,6 +40,115 @@
 #include <libARSAL/ARSAL_Time.h>
 #include <errno.h>
 
+#if defined(_PSP)
+#include <pspthreadman.h>
+#include <pspkerror.h>
+
+int ARSAL_Sem_Init(ARSAL_Sem_t *sem, int shared, int value)
+{
+    SceUID *sem_id;
+
+    sem_id = malloc(sizeof(SceUID));
+
+    *sem_id = sceKernelCreateSema("ARSAL Sem", 0, value, 255, NULL);
+    if (*sem_id < 0) {
+        free (sem_id);
+        return -1;
+    }
+
+    *sem = (ARSAL_Sem_t) sem_id;
+    return 0;
+}
+
+int ARSAL_Sem_Destroy(ARSAL_Sem_t *sem)
+{
+    SceUID *sem_id = (SceUID *) *sem;
+
+    if (sceKernelDeleteSema(*sem_id) < 0)
+        return - 1;
+
+    free(sem_id);
+    return 0;
+}
+
+int ARSAL_Sem_Wait(ARSAL_Sem_t *sem)
+{
+    return ARSAL_Sem_Timedwait(sem, NULL);
+}
+
+int ARSAL_Sem_Trywait(ARSAL_Sem_t *sem)
+{
+    SceUID *sem_id = (SceUID *) *sem;
+    int ret;
+
+    ret = sceKernelPollSema(*sem_id, 1);
+    if (ret < 0) {
+        errno = EAGAIN;
+        return -1;
+    }
+
+    return 0;
+}
+
+int ARSAL_Sem_Timedwait(ARSAL_Sem_t *sem, const struct timespec *timeout)
+{
+    SceUID *sem_id = (SceUID *) *sem;
+    int ret;
+    SceUInt timeout_us = 0;
+    SceUInt *ptimeout = NULL;
+
+    if (*sem_id < 0) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    if (timeout) {
+        timeout_us = SEC_TO_USEC(timeout->tv_sec)
+                + NSEC_TO_USEC(timeout->tv_nsec);
+        ptimeout = &timeout_us;
+    }
+
+    ret = sceKernelWaitSema(*sem_id, 1, ptimeout);
+    if (ret < 0) {
+        if (ret == SCE_KERNEL_ERROR_WAIT_TIMEOUT)
+            errno = ETIMEDOUT;
+        ret = -1;
+    }
+
+    return ret;
+}
+
+int ARSAL_Sem_Post(ARSAL_Sem_t *sem)
+{
+    SceUID *sem_id = (SceUID *) *sem;
+    int ret;
+
+    if (*sem_id < 0) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    ret = sceKernelSignalSema(*sem_id, 1);
+    if (ret < 0)
+        return -1;
+
+    return 0;
+}
+
+int ARSAL_Sem_Getvalue(ARSAL_Sem_t *sem, int *value)
+{
+    SceUID *sem_id = (SceUID *) *sem;
+    SceKernelSemaInfo info;
+
+    if (sceKernelReferSemaStatus(*sem_id, &info) < 0)
+        return -1;
+
+    *value = info.currentCount;
+    return 0;
+}
+
+#else
+
 #if defined(HAVE_SEMAPHORE_H) &&                \
     defined(HAVE_SEM_DESTROY) &&                \
     defined(HAVE_SEM_GETVALUE) &&               \
@@ -529,3 +638,5 @@ int ARSAL_Sem_Getvalue(ARSAL_Sem_t *sem, int *value)
 
     return result;
 }
+
+#endif

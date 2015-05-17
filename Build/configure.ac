@@ -55,8 +55,8 @@ CPPFLAGS+="$LOCAL_CFLAGS"
 CFLAGS+="$LOCAL_CFLAGS"
 OBJCFLAGS+="$LOCAL_CFLAGS"
 
-AR_DEPENDS([ssl], [Y], [openssl/ssl.h], [N])
-AR_DEPENDS([crypto], [Y], [openssl/crypto.h], [N])
+#AR_DEPENDS([ssl], [Y], [openssl/ssl.h], [N])
+#AR_DEPENDS([crypto], [Y], [openssl/crypto.h], [N])
 
 ##########################################################################
 # Check headers
@@ -71,15 +71,19 @@ AC_CHECK_HEADERS([sys/uio.h], , AC_MSG_WARN(no sys/uio.h found, use internal))
 
 HAVE_MUTEX="no"
 
-# Checks for pthread.h
-AC_CHECK_HEADERS([pthread.h], [
-    AC_CHECK_FUNC(pthread_create, , [
-        AC_CHECK_LIB(pthread, pthread_create, [
-            LIBS="$LIBS -pthread"
-            HAVE_MUTEX="yes"
+AS_IF([test "$host" = "psp"], [
+        HAVE_MUTEX="yes"
+    ], [
+        # Checks for pthread.h
+        AC_CHECK_HEADERS([pthread.h], [
+            AC_CHECK_FUNC(pthread_create, , [
+                AC_CHECK_LIB(pthread, pthread_create, [
+                    LIBS="$LIBS -pthread"
+                    HAVE_MUTEX="yes"
+                ],)
+            ])
         ],)
     ])
-],)
 
 # Checks for semaphore.h
 AC_CHECK_HEADERS([semaphore.h], , AC_MSG_ERROR(The semaphore header is required in order to build the library!))
