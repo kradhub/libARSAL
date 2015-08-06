@@ -40,7 +40,10 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+
+#ifdef HAVE_SYS_UIO_H
 #include <sys/uio.h>
+#endif
 
 /**
  * @brief Creates an endpoint for communication and returns a descriptor.
