@@ -59,6 +59,12 @@
 #define SSIZE_MAX (__SIZE_MAX__ >> 1)
 #endif
 
+struct iovec
+{
+	void *iov_base;
+	size_t iov_len;
+}
+
 static ssize_t writev(int sockfd, const struct iovec *iov, int iovcnt)
 {
     int i;
