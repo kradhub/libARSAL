@@ -68,6 +68,8 @@ AC_CHECK_DECLS([SYS_gettid],[],[],[[#include <sys/syscall.h>]])
 AC_CHECK_HEADERS([android/log.h], LIBS+=" -llog",)
 
 AC_CHECK_HEADERS([sys/uio.h], , AC_MSG_WARN(no sys/uio.h found, use internal))
+AC_CHECK_TYPES([struct iovec],,,[[#include <sys/socket.h>]
+    AC_INCLUDES_DEFAULT])
 
 HAVE_MUTEX="no"
 

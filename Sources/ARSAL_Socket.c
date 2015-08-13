@@ -59,11 +59,13 @@
 #define SSIZE_MAX (__SIZE_MAX__ >> 1)
 #endif
 
+#ifndef HAVE_STRUCT_IOVEC
 struct iovec
 {
 	void *iov_base;
 	size_t iov_len;
 }
+#endif
 
 static ssize_t writev(int sockfd, const struct iovec *iov, int iovcnt)
 {
